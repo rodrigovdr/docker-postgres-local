@@ -274,17 +274,28 @@ Backups run automatically according to the `BACKUP_SCHEDULE` in your `.env` file
 
 ### Manual Backup
 
-Run a manual backup using the provided script:
+Run a manual backup using the provided script for your operating system:
 
-```bash
-./backup_now.command
+#### Windows (PowerShell)
+
+```powershell
+.\backup_now.ps1
 ```
 
-Or on Linux:
+#### Linux / macOS
 
 ```bash
-bash backup_now.command
+bash backup_now.sh
 ```
+
+Or make it executable and run directly:
+
+```bash
+chmod +x backup_now.sh
+./backup_now.sh
+```
+
+**Note**: The original `backup_now.command` file is still available for macOS compatibility, but `backup_now.sh` works on both Linux and macOS.
 
 This script:
 1. Executes a backup via the backup container
@@ -430,7 +441,9 @@ docker-compose down -v
 ├── nginx.conf               # Nginx reverse proxy configuration
 ├── .env                     # Environment variables (create from .env.example)
 ├── .env.example             # Example environment variables
-├── backup_now.command       # Manual backup script
+├── backup_now.ps1          # Manual backup script (Windows PowerShell)
+├── backup_now.sh           # Manual backup script (Linux/macOS)
+├── backup_now.command      # Manual backup script (macOS - legacy)
 ├── backups/                 # Backup files directory
 ├── init-scripts/
 │   ├── 01-bootstrap.sql     # Database foundation setup (schemas, roles, functions)
