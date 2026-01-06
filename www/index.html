@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dev Dashboard - Client Management</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f4f4f9; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        
+        /* Authentication Box */
+        .auth-box { background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #d1d9e6; }
+        
+        /* Registration Form */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; margin-bottom: 20px; background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #eee; }
+        
+        input { padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { background: #007aff; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #0056b3; }
+        button.delete { background: #ff3b30; padding: 5px 10px; font-size: 12px; }
+        button.delete:hover { background: #c62828; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; color: #666; text-transform: uppercase; font-size: 12px; }
+        
+        .status { margin-top: 10px; font-size: 0.9em; font-weight: bold; min-height: 1.2em; }
+        .error { color: #d9534f; }
+        .success { color: #5cb85c; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Client Management</h1>
+    
+    <div class="auth-box">
+        <strong>🔑 Access Token (JWT)</strong>
+        <input type="password" id="jwtToken" placeholder="Paste the token generated in Swagger here...">
+        <div id="statusMessage" class="status">Waiting for token...</div>
+    </div>
+
+    <h3>Register New Client</h3>
+    <div class="form-grid">
+        <input type="text" id="newName" placeholder="Full Name" required>
+        <input type="email" id="newEmail" placeholder="Email" required>
+        <input type="text" id="newCity" placeholder="City">
+        <button onclick="saveClient()">Add</button>
+    </div>
+
+    <hr>
+
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3>Client List</h3>
+        <button onclick="loadClients()" style="background: #34c759;">🔄 Refresh List</button>
+    </div>
+
+    <table id="clientsTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>City</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    // Utility function to clean the token
+    function getCleanToken() {
+        const rawToken = document.getElementById('jwtToken').value;
+        return rawToken.trim().replace(/^["'](.+)["']$/, '$1');
+    }
+
+    // LIST CLIENTS (GET)
+    async function loadClients() {
+        const token = getCleanToken();
+        const statusMessage = document.getElementById('statusMessage');
+        const tableBody = document.getElementById('tableBody');
+        
+        if (!token) {
+            statusMessage.innerText = "⚠️ Please enter the token first.";
+            return;
+        }
+
+        statusMessage.innerText = "Loading...";
+        tableBody.innerHTML = "";
+
+        try {
+            const response = await fetch('/api/customers', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                const errorMessage = response.status === 401 ? "Unauthorized. Please check your token." :
+                                   response.status === 403 ? "Forbidden. Insufficient permissions." :
+                                   `Error loading data (${response.status}). Please try again.`;
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            
+            if (!Array.isArray(data)) {
+                throw new Error("Invalid response format from server.");
+            }
+
+            if (data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">No customers found.</td></tr>';
+            } else {
+                tableBody.innerHTML = "";
+                data.forEach(customer => {
+                    const createdAt = customer.created_at ? new Date(customer.created_at).toLocaleDateString() : '-';
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td>${customer.id}</td>
+                            <td>${customer.full_name || '-'}</td>
+                            <td>${customer.email || '-'}</td>
+                            <td>${customer.city || '-'}</td>
+                            <td><button class="delete" onclick="deleteClient(${customer.id})">Delete</button></td>
+                        </tr>`;
+                });
+            }
+            statusMessage.innerText = "✅ Data updated.";
+            statusMessage.className = "status success";
+        } catch (e) {
+            statusMessage.innerText = "❌ " + e.message;
+            statusMessage.className = "status error";
+            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #d9534f;">Failed to load data.</td></tr>';
+        }
+    }
+
+    // SAVE CLIENT (POST)
+    async function saveClient() {
+        const token = getCleanToken();
+        const nameInput = document.getElementById('newName');
+        const emailInput = document.getElementById('newEmail');
+        const cityInput = document.getElementById('newCity');
+        
+        const name = nameInput.value.trim();
+        const email = emailInput.value.trim();
+        const city = cityInput.value.trim();
+
+        // Client-side validation
+        if (!name || !email) {
+            alert("Please fill in all required fields (Name and Email).");
+            return;
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            alert("Please enter a valid email address.");
+            emailInput.focus();
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/customers', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation' // Makes PostgreSQL return the created object
+                },
+                body: JSON.stringify({ full_name: name, email, city: city || null })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const errorMessage = errorData.message || errorData.details || 
+                    (response.status === 409 ? "Email already exists." : 
+                     response.status === 401 ? "Unauthorized. Please check your token." :
+                     "Error saving. Please try again.");
+                throw new Error(errorMessage);
+            }
+
+            // Clear form
+            nameInput.value = '';
+            emailInput.value = '';
+            cityInput.value = '';
+            loadClients();
+        } catch (e) {
+            alert(e.message);
+        }
+    }
+
+    // DELETE CLIENT (DELETE)
+    async function deleteClient(id) {
+        if (!confirm("Do you really want to delete this client?")) return;
+        const token = getCleanToken();
+
+        if (!token) {
+            alert("Please enter your token first.");
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/customers?id=eq.${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                const errorMessage = response.status === 401 ? "Unauthorized. Please check your token." :
+                                   response.status === 404 ? "Client not found." :
+                                   response.status === 403 ? "Forbidden. Insufficient permissions." :
+                                   `Error deleting client (${response.status}). Please try again.`;
+                throw new Error(errorMessage);
+            }
+            
+            loadClients();
+        } catch (e) {
+            alert(e.message);
+        }
+    }
+</script>
+</body>
+</html>

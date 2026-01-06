@@ -1,0 +1,17 @@
+# Certificates and Keys (Security)
+/nginx_ssl/*.key
+/nginx_ssl/*.crt
+
+# Database Data (NEVER commit to Git)
+pg_data/
+pgadmin_data/
+sql/
+
+# Backups
+/backups/*.sql.gz
+
+# Sensitive Configuration
+.env
+
+# Mac System Files
+.DS_Store
